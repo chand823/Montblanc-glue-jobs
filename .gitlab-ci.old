@@ -1,0 +1,295 @@
+# Use Glue Python helper image
+image: 616966241685.dkr.ecr.eu-central-1.amazonaws.com/glue-cicd/glue-python:latest
+
+# Stages
+stages:
+- validate
+- dependencies
+- publish
+
+# Environment variables
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  AWS_CLI_DEFAULT_REGION: 'eu-central-1'
+  AWS_REGION: 'eu-central-1'
+  AWS_DEFAULT_REGION: 'eu-central-1'
+  VERSION: 1.0.0
+  TIMESTAMP: "XXX"
+  
+  DOCKER_AUTH_CONFIG: |
+    {
+      "credHelpers": {
+        "616966241685.dkr.ecr.eu-central-1.amazonaws.com": "ecr-login"
+      }
+    }
+
+# TEMPLATES
+# ====================
+# Lint and validations
+.lint:
+  stage: validate
+  script:
+    # Exit zero even there are errors
+    # More on flake8: https://flake8.pycqa.org/en/latest/user/invocation.html
+    - cd ${glue_folder}
+    - flake8 --statistics --exit-zero
+  tags:
+      - ci
+      - global
+      - aws-616966241685
+
+# Package
+.get_dependencies:
+    stage: dependencies
+    script:
+        # Zip requirements
+        - pip install -r ${glue_folder}/requirements.txt -t ${glue_folder}/python
+        - ls -l ${glue_folder}/python
+    artifacts:
+      paths:
+        - ${glue_folder}/python
+      expire_in: 30 minutes
+    tags:
+      - ci
+      - global
+      - aws-616966241685
+
+# Publish
+.s3_publish_template_feature:
+  stage: publish
+  script:
+    # Validate folders
+    - chmod +x ./folder_validation.sh
+    - ./folder_validation.sh
+
+    # Get timestamp
+    - export TIMESTAMP=$(date --utc +%Y%m%d%H%M)
+
+    # Upload source to S3     
+    - aws s3 cp ${glue_folder}/src s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/src-${TIMESTAMP}/ --recursive
+    
+    - aws s3 ls s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/src-${TIMESTAMP}/
+    
+    # Upload dependencies to S3
+    - aws s3 cp ${glue_folder}/python s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/extra-py-files --recursive
+
+    - aws s3 ls s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/extra-py-files/
+    
+    # Upload files to S3
+    - aws s3 cp ${glue_folder}/files s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/extra-files --recursive
+    
+    - aws s3 ls s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/extra-files/
+
+    # Upload jars to S3
+    - aws s3 cp ${glue_folder}/jars s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/snapshots/${glue_folder}/${VERSION}-SNAPSHOT/extra-jars --recursive  
+  tags:
+      - ci
+      - global
+      - aws-616966241685
+
+.s3_publish_template_master:
+  stage: publish
+  script:
+    # Validate folders
+    - chmod +x ./folder_validation.sh
+    - ./folder_validation.sh
+    
+    # Upload source to S3     
+    - aws s3 cp ${glue_folder}/src s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/src/ --recursive
+    
+    - aws s3 ls s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/src/
+    
+    # Upload dependencies to S3
+    - aws s3 cp ${glue_folder}/python s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/extra-py-files --recursive
+
+    - aws s3 ls s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/extra-py-files/
+    
+    # Upload files to S3
+    - aws s3 cp ${glue_folder}/files s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/extra-files --recursive
+
+    # Upload jars to S3
+    - aws s3 cp ${glue_folder}/jars s3://bay-cph-cpd-tooling-code-distribution-eu-central-1/glue/releases/${glue_folder}/${VERSION}-RELEASE/extra-jars --recursive
+  when: manual
+  tags:
+      - ci
+      - global
+      - aws-616966241685
+
+ # PIPELINE FOR bay-cdp-sfmc-landing-job-eu-central-1
+ #==========================
+ #Lint and validations
+lint_bay-cdp-sfmc-landing-job-eu-central-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-eu-central-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-landing-job-eu-central-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-eu-central-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-landing-job-eu-central-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-eu-central-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-landing-job-eu-central-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-eu-central-1
+  only:
+    - master
+   
+   # PIPELINE FOR bay-cdp-sfmc-landing-job-us-east-1
+ #==========================
+ #Lint and validations
+lint_bay-cdp-sfmc-landing-job-us-east-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-us-east-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-landing-job-us-east-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-us-east-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-landing-job-us-east-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-us-east-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-landing-job-us-east-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-landing-job-us-east-1
+  only:
+    - master
+   
+   # PIPELINE FOR bay-cdp-sfmc-raw-job-eu-central-1
+# ==========================
+# Lint and validations
+lint_bay-cdp-sfmc-raw-job-eu-central-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-eu-central-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-raw-job-eu-central-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-eu-central-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-raw-job-eu-central-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-eu-central-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-raw-job-eu-central-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-eu-central-1
+  only:
+    - master
+   
+    
+      # PIPELINE FOR bay-cdp-sfmc-raw-job-us-east-1
+# ==========================
+# Lint and validations
+lint_bay-cdp-sfmc-raw-job-us-east-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-us-east-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-raw-job-us-east-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-us-east-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-raw-job-us-east-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-us-east-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-raw-job-us-east-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-raw-job-us-east-1
+  only:
+    - master
+    
+    
+     # PIPELINE FOR bay-cdp-sfmc-enrich-job-eu-central-1
+# ==========================
+# Lint and validations
+lint_bay-cdp-sfmc-enrich-job-eu-central-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-eu-central-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-enrich-job-eu-central-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-eu-central-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-enrich-job-eu-central-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-eu-central-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-enrich-job-eu-central-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-eu-central-1
+  only:
+    - master
+   
+   
+     # PIPELINE FOR bay-cdp-sfmc-enrich-job-us-east-1
+# ==========================
+# Lint and validations
+lint_bay-cdp-sfmc-enrich-job-us-east-1:
+  extends: .lint
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-us-east-1
+
+# Dependencies
+get_dependencies_bay-cdp-sfmc-enrich-job-us-east-1:
+  extends: .get_dependencies
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-us-east-1
+
+# Publish
+s3_publish_feature_bay-cdp-sfmc-enrich-job-us-east-1:
+  extends: .s3_publish_template_feature
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-us-east-1
+  only:
+      - /^feature-.*$/
+
+s3_publish_master_bay-cdp-sfmc-enrich-job-us-east-1:
+  extends: .s3_publish_template_master
+  variables:
+    glue_folder: bay-cdp-sfmc-enrich-job-us-east-1
+  only:
+    - master
+
+

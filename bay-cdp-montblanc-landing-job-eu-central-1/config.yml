@@ -1,0 +1,21 @@
+# Project configuration
+#######################
+
+# Package version
+version: "1.0.0"
+
+# Artifact name
+artifact_name: "bay-cdp-montblanc-landing-job-eu-central-1"
+
+# Artifact metadata
+author: "Example"
+author_email: "example@cognizant.com"
+description: "A small example package"
+url: "https://gitlab.bayer.com/ph-cdp/Landing Layer/Glue/glue-sources/Montblanc-glue-jobs"
+
+# Glue job name
+glue_job_name: "bay-cdp-montblanc-landing-job-eu-central-1"
+
+# Pipeline configuration
+# run_test: "true"
+custom_config: "true"
